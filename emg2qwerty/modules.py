@@ -169,6 +169,57 @@ class MultiBandRotationInvariantMLP(nn.Module):
         return torch.stack(outputs_per_band, dim=self.stack_dim)
 
 
+class RNNEncoder(nn.Module):
+    """An RNN-based encoder that processes temporal sequences.
+
+    Supports vanilla RNN, LSTM, and GRU. Input shape is (T, N, num_features)
+    and output shape is (T, N, output_size). Unlike the TDS conv encoder,
+    this does not reduce the temporal dimension.
+
+    Args:
+        num_features (int): Number of input features per timestep.
+        hidden_size (int): Number of hidden units in the RNN.
+        num_layers (int): Number of stacked RNN layers.
+        rnn_type (str): Type of RNN cell - "rnn", "lstm", or "gru".
+        bidirectional (bool): Whether to use bidirectional RNN.
+        dropout (float): Dropout between RNN layers (applied when num_layers > 1).
+    """
+
+    def __init__(
+        self,
+        num_features: int,
+        hidden_size: int = 256,
+        num_layers: int = 3,
+        rnn_type: str = "gru",
+        bidirectional: bool = True,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        rnn_type = rnn_type.lower()
+        assert rnn_type in {"rnn", "lstm", "gru"}, f"Unsupported rnn_type: {rnn_type}"
+
+        rnn_cls = {"rnn": nn.RNN, "lstm": nn.LSTM, "gru": nn.GRU}[rnn_type]
+
+        self.rnn = rnn_cls(
+            input_size=num_features,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=False,  # Input is (T, N, features)
+            bidirectional=bidirectional,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+
+        rnn_output_size = hidden_size * (2 if bidirectional else 1)
+        self.layer_norm = nn.LayerNorm(rnn_output_size)
+        self.output_size = rnn_output_size
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, num_features)
+        output, _ = self.rnn(inputs)  # (T, N, hidden_size * num_directions)
+        return self.layer_norm(output)  # (T, N, output_size)
+
+
 class TDSConv2dBlock(nn.Module):
     """A 2D temporal convolution block as per "Sequence-to-Sequence Speech
     Recognition with Time-Depth Separable Convolutions, Hannun et al"
