@@ -10,6 +10,8 @@ import pprint
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+import torch
+torch.backends.cudnn.benchmark = False
 
 import hydra
 import pytorch_lightning as pl
