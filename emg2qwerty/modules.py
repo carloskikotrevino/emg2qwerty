@@ -329,3 +329,57 @@ class TDSConvEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+    
+
+class CNNBiLSTMEncoder(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        cnn_channels: Sequence[int] = (256, 256, 256),
+        kernel_size: int = 3,
+        lstm_hidden_size: int = 256,
+        num_lstm_layers: int = 2,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        cnn_layers: list[nn.Module] = []
+        in_channels = num_features
+        for out_channels in cnn_channels:
+            cnn_layers.extend(
+                [
+                    nn.Conv1d(
+                        in_channels,
+                        out_channels,
+                        kernel_size=kernel_size,
+                        padding=kernel_size // 2,
+                    ),
+                    nn.BatchNorm1d(out_channels),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                ]
+            )
+            in_channels = out_channels
+        self.cnn = nn.Sequential(*cnn_layers)
+
+        self.bilstm = nn.LSTM(
+            input_size=in_channels,
+            hidden_size=lstm_hidden_size,
+            num_layers=num_lstm_layers,
+            batch_first=False, 
+            bidirectional=True,
+            dropout=dropout if num_lstm_layers > 1 else 0.0,
+        )
+
+        self.output_size = lstm_hidden_size * 2
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        T, N, C = inputs.shape
+
+        x = inputs.permute(1, 2, 0)
+        x = self.cnn(x) 
+        x = x.permute(2, 0, 1) 
+
+        x, _ = self.bilstm(x)
+
+        return x
