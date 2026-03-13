@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from collections.abc import Sequence
+import math
 
 import torch
 from torch import nn
@@ -218,6 +219,111 @@ class RNNEncoder(nn.Module):
         # inputs: (T, N, num_features)
         output, _ = self.rnn(inputs)  # (T, N, hidden_size * num_directions)
         return self.layer_norm(output)  # (T, N, output_size)
+
+
+
+class TemporalConvBlock(nn.Module):
+    """Residual depthwise-separable temporal conv block for inputs of shape (T, N, C)."""
+
+    def __init__(
+        self,
+        channels: int,
+        kernel_size: int = 3,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if kernel_size % 2 == 0:
+            raise ValueError("kernel_size must be odd for same-length padding.")
+
+        padding = (kernel_size - 1) // 2
+
+        self.depthwise_conv = nn.Conv1d(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            groups=channels,
+        )
+        self.pointwise_conv = nn.Conv1d(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=1,
+        )
+        self.bn1 = nn.BatchNorm1d(channels)
+        self.bn2 = nn.BatchNorm1d(channels)
+        self.act = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, C)
+        x = inputs.permute(1, 2, 0)  # (N, C, T)
+        residual = x
+
+        x = self.depthwise_conv(x)
+        x = self.bn1(x)
+        x = self.act(x)
+
+        x = self.pointwise_conv(x)
+        x = self.bn2(x)
+        x = self.act(x)
+        x = self.dropout(x)
+
+        x = x + residual
+        return x.permute(2, 0, 1)  # (T, N, C)
+
+
+class CNNBiGRUEncoder(nn.Module):
+    """CNN + BiGRU encoder for inputs of shape (T, N, num_features)."""
+
+    def __init__(
+        self,
+        num_features: int,
+        conv_channels: int = 256,
+        num_conv_layers: int = 3,
+        kernel_size: int = 3,
+        hidden_size: int = 256,
+        num_layers: int = 2,
+        bidirectional: bool = True,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        self.input_proj = nn.Sequential(
+            nn.Linear(num_features, conv_channels),
+            nn.LayerNorm(conv_channels),
+            nn.Dropout(dropout),
+        )
+
+        self.conv_blocks = nn.Sequential(
+            *[
+                TemporalConvBlock(
+                    channels=conv_channels,
+                    kernel_size=kernel_size,
+                    dropout=dropout,
+                )
+                for _ in range(num_conv_layers)
+            ]
+        )
+
+        self.gru = nn.GRU(
+            input_size=conv_channels,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=False,  # (T, N, C)
+            bidirectional=bidirectional,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+
+        self.output_size = hidden_size * (2 if bidirectional else 1)
+        self.output_norm = nn.LayerNorm(self.output_size)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, num_features)
+        x = self.input_proj(inputs)   # (T, N, conv_channels)
+        x = self.conv_blocks(x)       # (T, N, conv_channels)
+        x, _ = self.gru(x)            # (T, N, output_size)
+        return self.output_norm(x)    # (T, N, output_size)
+
 
 
 class TDSConv2dBlock(nn.Module):
