@@ -22,6 +22,7 @@ from emg2qwerty.charset import charset
 from emg2qwerty.data import LabelData, WindowedEMGDataset
 from emg2qwerty.metrics import CharacterErrorRates
 from emg2qwerty.modules import (
+    CNNBiGRUEncoder,
     MultiBandRotationInvariantMLP,
     RNNEncoder,
     SpectrogramNorm,
@@ -424,7 +425,8 @@ class RNNCTCModule(pl.LightningModule):
             lr_scheduler_config=self.hparams.lr_scheduler,
         )
 
-class CNNBiLSTMCTCModule(pl.LightningModule):
+class CNNBiGRUCTCModule(pl.LightningModule):
+    """A CTC-based module using a CNN + BiGRU encoder for keystroke decoding."""
 
     NUM_BANDS: ClassVar[int] = 2
     ELECTRODE_CHANNELS: ClassVar[int] = 16
@@ -433,10 +435,12 @@ class CNNBiLSTMCTCModule(pl.LightningModule):
         self,
         in_features: int,
         mlp_features: Sequence[int],
-        cnn_channels: Sequence[int],
+        conv_channels: int,
+        num_conv_layers: int,
         kernel_size: int,
-        lstm_hidden_size: int,
-        num_lstm_layers: int,
+        hidden_size: int,
+        num_layers: int,
+        bidirectional: bool,
         dropout: float,
         optimizer: DictConfig,
         lr_scheduler: DictConfig,
@@ -447,30 +451,33 @@ class CNNBiLSTMCTCModule(pl.LightningModule):
 
         num_features = self.NUM_BANDS * mlp_features[-1]
 
-        encoder = CNNBiLSTMEncoder(
+        self.spec_norm = SpectrogramNorm(
+            channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS
+        )
+        self.multiband_mlp = MultiBandRotationInvariantMLP(
+            in_features=in_features,
+            mlp_features=mlp_features,
+            num_bands=self.NUM_BANDS,
+        )
+        self.flatten = nn.Flatten(start_dim=2)
+
+        self.encoder = CNNBiGRUEncoder(
             num_features=num_features,
-            cnn_channels=cnn_channels,
+            conv_channels=conv_channels,
+            num_conv_layers=num_conv_layers,
             kernel_size=kernel_size,
-            lstm_hidden_size=lstm_hidden_size,
-            num_lstm_layers=num_lstm_layers,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            bidirectional=bidirectional,
             dropout=dropout,
         )
 
-        self.model = nn.Sequential(
-            SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
-            MultiBandRotationInvariantMLP(
-                in_features=in_features,
-                mlp_features=mlp_features,
-                num_bands=self.NUM_BANDS,
-            ),
-            nn.Flatten(start_dim=2),
-            encoder,
-            nn.Linear(encoder.output_size, charset().num_classes),
+        self.output_proj = nn.Sequential(
+            nn.Linear(self.encoder.output_size, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
-        
-        self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
 
+        self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
         self.decoder = instantiate(decoder)
 
         metrics = MetricCollection([CharacterErrorRates()])
@@ -482,7 +489,11 @@ class CNNBiLSTMCTCModule(pl.LightningModule):
         )
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.model(inputs)
+        x = self.spec_norm(inputs)
+        x = self.multiband_mlp(x)   # (T, N, 2, mlp_features[-1])
+        x = self.flatten(x)         # (T, N, num_features)
+        x = self.encoder(x)         # (T, N, encoder_output)
+        return self.output_proj(x)  # (T, N, num_classes)
 
     def _step(
         self, phase: str, batch: dict[str, torch.Tensor], *args, **kwargs
@@ -491,18 +502,18 @@ class CNNBiLSTMCTCModule(pl.LightningModule):
         targets = batch["targets"]
         input_lengths = batch["input_lengths"]
         target_lengths = batch["target_lengths"]
-        N = len(input_lengths)  # batch_size
+        N = len(input_lengths)
 
         emissions = self.forward(inputs)
 
-        T_diff = inputs.shape[0] - emissions.shape[0]
-        emission_lengths = input_lengths - T_diff
+        # CNN blocks use same padding, BiGRU preserves time length
+        emission_lengths = input_lengths
 
         loss = self.ctc_loss(
             log_probs=emissions,
-            targets=targets.transpose(0, 1), 
+            targets=targets.transpose(0, 1),
             input_lengths=emission_lengths,
-            target_lengths=target_lengths, 
+            target_lengths=target_lengths,
         )
 
         predictions = self.decoder.decode_batch(
@@ -511,10 +522,10 @@ class CNNBiLSTMCTCModule(pl.LightningModule):
         )
 
         metrics = self.metrics[f"{phase}_metrics"]
-        targets = targets.detach().cpu().numpy()
-        target_lengths = target_lengths.detach().cpu().numpy()
+        targets_np = targets.detach().cpu().numpy()
+        target_lengths_np = target_lengths.detach().cpu().numpy()
         for i in range(N):
-            target = LabelData.from_labels(targets[: target_lengths[i], i])
+            target = LabelData.from_labels(targets_np[: target_lengths_np[i], i])
             metrics.update(prediction=predictions[i], target=target)
 
         self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
