@@ -9,6 +9,7 @@ import math
 
 import torch
 from torch import nn
+import math
 
 
 class SpectrogramNorm(nn.Module):
@@ -488,4 +489,89 @@ class CNNBiLSTMEncoder(nn.Module):
 
         x, _ = self.bilstm(x)
 
+        return x
+    
+class PatchEmbedding(nn.Module):
+    def __init__(self, in_channel,patch_size=16, embed_dim=256):
+        super().__init__()
+        self.patch_size = patch_size
+        self.proj = nn.Conv1d(in_channel, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.norm = nn.LayerNorm(embed_dim)
+        self.gelu = nn.GELU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (T, B, embed_dim)
+        T,N,B,C=x.shape
+        x=x.reshape(T,N,-1)
+        x = x.permute(1, 2, 0)              # (B, embed_dim, T)
+        x = self.proj(x)                     # (B, embed_dim, num_patches)
+        x = x.permute(2, 0, 1)              # (num_patches, B, embed_dim)
+        return self.gelu(self.norm(x)) 
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model, max_len=2000):
+        super().__init__()
+
+        position = torch.arange(max_len).unsqueeze(1)
+
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) *
+            (-math.log(10000.0) / d_model)
+        )
+
+        pe = torch.zeros(max_len, d_model)
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        self.register_buffer("pe", pe.unsqueeze(0))
+
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1)]
+
+class EMGTransformer(nn.Module):
+
+    def __init__(self, embed_dim=256, num_heads=8, num_layers=4):
+
+        super().__init__()
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=embed_dim*4,
+            dropout=0.1,
+            activation='gelu',
+            batch_first=True
+        )
+
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers
+        )
+
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self,x):
+
+        x = self.encoder(x)
+        return self.norm(x)
+
+
+class EMGWaveletTransformer(nn.Module):
+
+    def __init__(self,in_channel,embed_dim,num_heads,num_layers,num_classes,patch_size,dropout):
+
+        super().__init__()
+
+        self.patch = PatchEmbedding(in_channel,patch_size,embed_dim)
+        self.pos = PositionalEncoding(embed_dim)
+        self.transformer = EMGTransformer(embed_dim, num_heads, num_layers)
+        self.norm=nn.LayerNorm(embed_dim)
+
+    def forward(self,x):
+        x = self.patch(x)
+        x=self.pos(x)
+        x=self.norm(x)
+        x = self.transformer(x)
         return x
