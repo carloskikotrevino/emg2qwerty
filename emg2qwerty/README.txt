@@ -23,9 +23,8 @@ Important modified files
 - config/model/rnn_ctc.yaml
 - config/model/cnn_bigru_ctc.yaml
 - config/model/<cnn_bilstm config file, if included>
-- emg2qwerty/train.py (only if the submitted version includes our cuDNN or other run-related changes)
+- emg2qwerty/train.py 
 - main.tex / report PDF
-- notebook(s), if included
 
 Reported model ownership
 - Kiko Trevino: Bidirectional GRU
