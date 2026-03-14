@@ -22,7 +22,7 @@ Important modified files
 - emg2qwerty/modules.py
 - config/model/rnn_ctc.yaml
 - config/model/cnn_bigru_ctc.yaml
-- config/model/<cnn_bilstm config file, if included>
+- config/model/cnn_bilstm_ctc.yaml
 - emg2qwerty/train.py 
 - main.tex / report PDF
 
@@ -30,7 +30,7 @@ Reported model ownership
 - Kiko Trevino: Bidirectional GRU
 - Sherine Chally: CNN + BiLSTM
 - Anik Malik: CNN + BiGRU
-- Author Four: TDS baseline and exploratory vision-transformer-style model
+- Janani Venkatramani: TDS baseline and exploratory vision-transformer-style model
 
 Exploratory model
 We also explored a Transformer / vision-transformer-style model as an architectural idea. It was treated as exploratory and was not included in the main quantitative comparison because its training behavior was unstable and its results were not competitive with the main recurrent and hybrid models.
@@ -64,7 +64,7 @@ python -m emg2qwerty.train \
 
 Typical run command for the CNN+BiLSTM model
 python -m emg2qwerty.train \
-  model=<cnn_bilstm_config_name> \
+  model=cnn_bilstm_ctc \
   user=single_user \
   trainer.accelerator=gpu \
   trainer.devices=1
@@ -72,7 +72,7 @@ python -m emg2qwerty.train \
 Notes on the configs
 - rnn_ctc.yaml contains the Bidirectional GRU configuration.
 - cnn_bigru_ctc.yaml contains the final CNN+BiGRU configuration used for the reported result.
-- If a separate CNN+BiLSTM config file is included, that config should be used for reproducing the reported CNN+BiLSTM result.
+- cnn_bilstm_ctc.yaml contains the CNN+BiLSTM configuration. The model architecture (cnn_channels, lstm_hidden_size, num_lstm_layers, dropout) is fully defined in that file and does not require any command-line overrides to reproduce the reported result.
 - The reported CNN+BiGRU result used the exact command shown above, including the learning-rate override and gradient clipping.
 
 Checkpoint note
