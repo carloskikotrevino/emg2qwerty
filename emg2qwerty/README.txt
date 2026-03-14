@@ -59,16 +59,16 @@ python -m emg2qwerty.train \
   trainer.accelerator=gpu \
   trainer.devices=1
 
-Exact command used for the CNN+BiLSTM model
+Exact command used for the Transformer model
 python -m emg2qwerty.train \
-  model=cnn_bilstm_ctc \
+  model=vit \
   user=single_user \
   trainer.accelerator=gpu \
   trainer.devices=1
 
-Exact command used for the Transformer model
+Exact command used for the CNN+BiLSTM model
 python -m emg2qwerty.train \
-  model=vit \
+  model=cnn_bilstm_ctc \
   user=single_user \
   trainer.accelerator=gpu \
   trainer.devices=1
@@ -81,6 +81,7 @@ Notes on the configs
 - rnn_ctc.yaml contains the Bidirectional GRU configuration.
 - cnn_bigru_ctc.yaml contains the final CNN+BiGRU configuration used for the reported result.
 - cnn_bilstm_ctc.yaml contains the CNN+BiLSTM configuration. The model architecture (cnn_channels, lstm_hidden_size, num_lstm_layers, dropout) is fully defined in that file and does not require any command-line overrides to reproduce the reported result.
+- vit.yaml contains the Transformer configuration that was explored.
 - The reported CNN+BiGRU result used the exact command shown above, including the learning-rate override and gradient clipping.
 
 Checkpoint note
