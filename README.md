@@ -15,6 +15,114 @@ _Last updated 2/13/2025_
     - **Q: How do we update these configuration files?** A: Note the structure of YAML files include basic key-value pairs (i.e. ```<key>: <value>```) and hierarchical structure. So, for instance, if we wanted to update the ```mlp_features``` hyperparameter of the ```TDSConvCTCModule```, we would change the value at line 5 of ```config/model/tds_conv_ctc.yaml``` (under ```module```). _Read more details [here](https://pytorch-lightning.readthedocs.io/en/1.3.8/common/lightning_cli.html)._
     - **Q: Where do we configure data splitting?** A: Refer to ```config/user/single_user.yaml```. Be careful with your edits, so that you don't accidentally move the test data into your training set.
 
+---
+
+## Our Project: Predicting Keystrokes from Surface EMG Signals
+
+### Summary
+
+This submission contains the code and configuration files used for our final project on keystroke decoding from surface EMG (sEMG) using the emg2qwerty dataset. We compare the provided TDS convolutional baseline against recurrent and hybrid CNN+RNN architectures on the single-subject split for user #89335547. All models are trained with CTC loss and evaluated using Character Error Rate (CER).
+
+### Results
+
+| Model | Train CER (%) | Val CER (%) | Test CER (%) |
+|---|---|---|---|
+| TDS Conv (baseline) | 22.05 | 22.62 | 23.80 |
+| Bidirectional GRU | 12.80 | 17.10 | 17.33 |
+| CNN + BiGRU | 6.08 | 15.97 | 15.32 |
+| CNN + BiLSTM | 4.22 | 13.98 | 14.96 |
+
+### Conclusion
+
+The TDS baseline is substantially improved by adding explicit bidirectional sequence modeling. The Bidirectional GRU reduces test CER from 28.88 to 17.33. Adding a temporal convolutional stage before the recurrent encoder improves performance further. CNN+BiLSTM gives the best result at 14.96% test CER, and CNN+BiGRU closely follows at 15.32%.
+
+### Model Ownership
+
+| Model | Owner |
+|---|---|
+| TDS Conv baseline + Exploratory Transformer | Janani Venkatramani |
+| Bidirectional GRU | Kiko Trevino |
+| CNN + BiLSTM | Sherine Chally |
+| CNN + BiGRU | Anik Malik |
+
+### Run Commands
+
+**TDS Baseline**
+```bash
+python -m emg2qwerty.train \
+  model=tds_conv_ctc \
+  user=single_user \
+  trainer.accelerator=gpu \
+  trainer.devices=1
+```
+
+**Bidirectional GRU**
+```bash
+python -m emg2qwerty.train \
+  model=rnn_ctc \
+  user=single_user \
+  trainer.accelerator=gpu \
+  trainer.devices=1
+```
+
+**CNN + BiLSTM**
+```bash
+python -m emg2qwerty.train \
+  model=cnn_bilstm_ctc \
+  user=single_user \
+  trainer.accelerator=gpu \
+  trainer.devices=1
+```
+
+**CNN + BiGRU**
+```bash
+python -m emg2qwerty.train \
+  model=cnn_bigru_ctc \
+  user=single_user \
+  trainer.accelerator=gpu \
+  trainer.devices=1 \
+  trainer.max_epochs=50 \
+  optimizer.lr=7e-4 \
+  +trainer.gradient_clip_val=1.0
+```
+
+### Files Included in This Submission
+
+This submission includes code files, config files, and project write-up materials only, following the TA instruction not to submit checkpoints or logs.
+
+**Modified files:**
+- `emg2qwerty/lightning.py`
+- `emg2qwerty/modules.py`
+- `config/model/rnn_ctc.yaml`
+- `config/model/cnn_bigru_ctc.yaml`
+- `config/model/cnn_bilstm_ctc.yaml`
+- `emg2qwerty/train.py`
+- `main.tex` / report PDF
+
+### Config Notes
+
+- `rnn_ctc.yaml` — Bidirectional GRU configuration
+- `cnn_bilstm_ctc.yaml` — CNN+BiLSTM configuration. All architecture hyperparameters are defined in this file; no command-line overrides needed.
+- `cnn_bigru_ctc.yaml` — CNN+BiGRU configuration. The reported result used the exact command above, including the learning-rate override and gradient clipping.
+
+### Exploratory Model
+
+We also explored a Transformer/vision-transformer-style model as an additional architectural direction. It was treated as exploratory and was not included in the main quantitative comparison because its training behavior was unstable and its results were not competitive with the main recurrent and hybrid models.
+
+### Environment
+
+All experiments were run in Google Colab with GPU acceleration.
+
+### Checkpoint Note
+
+The best model checkpoint was saved during training and retained separately for team reference, but is not included in the submission in accordance with the TA instruction not to submit checkpoints or logs.
+
+### Reproducibility
+
+The submitted code and configs are sufficient to reproduce the model architectures and training setup. We do not include checkpoints, logs, or large artifacts in this submission.
+
+---
+
 # emg2qwerty
 [ [`Paper`](https://arxiv.org/abs/2410.20081) ] [ [`Dataset`](https://fb-ctrl-oss.s3.amazonaws.com/emg2qwerty/emg2qwerty-data-2021-08.tar.gz) ] [ [`Blog`](https://ai.meta.com/blog/open-sourcing-surface-electromyography-datasets-neurips-2024/) ] [ [`BibTeX`](#citing-emg2qwerty) ]
 
