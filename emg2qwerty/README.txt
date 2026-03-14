@@ -6,7 +6,7 @@ Summary
 This submission contains the code and configuration files used for our final project on keystroke decoding from surface EMG (sEMG) using the emg2qwerty dataset. We compare the provided TDS convolutional baseline against recurrent and hybrid CNN+RNN architectures on the single-subject split for user #89335547. All models are trained with CTC loss and evaluated using Character Error Rate (CER).
 
 Main reported results
-- TDS Conv (baseline): Train CER 15.00, Val CER 22.76, Test CER 28.88
+- TDS Conv (baseline): Train CER 22.05, Val CER 22.62, Test CER 23.80
 - Bidirectional GRU: Train CER 12.80, Val CER 17.10, Test CER 17.33
 - CNN + BiLSTM: Train CER 4.22, Val CER 13.98, Test CER 14.96
 - CNN + BiGRU: Train CER 6.08, Val CER 15.97, Test CER 15.32
