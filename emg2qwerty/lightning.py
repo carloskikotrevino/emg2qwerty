@@ -23,6 +23,7 @@ from emg2qwerty.data import LabelData, WindowedEMGDataset
 from emg2qwerty.metrics import CharacterErrorRates
 from emg2qwerty.modules import (
     CNNBiGRUEncoder,
+    CNNBiLSTMEncoder,
     MultiBandRotationInvariantMLP,
     RNNEncoder,
     SpectrogramNorm,
