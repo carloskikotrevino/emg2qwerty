@@ -34,7 +34,7 @@ This submission contains the code and configuration files used for our final pro
 
 ### Conclusion
 
-The TDS baseline is substantially improved by adding explicit bidirectional sequence modeling. The Bidirectional GRU reduces test CER from 28.88 to 17.33. Adding a temporal convolutional stage before the recurrent encoder improves performance further. CNN+BiLSTM gives the best result at 14.96% test CER, and CNN+BiGRU closely follows at 15.32%.
+The TDS baseline is substantially improved by adding explicit bidirectional sequence modeling. The Bidirectional GRU reduces test CER from 23.80 to 17.33. Adding a temporal convolutional stage before the recurrent encoder improves performance further. CNN+BiLSTM gives the best result at 14.96% test CER, and CNN+BiGRU closely follows at 15.32%.
 
 ### Model Ownership
 
@@ -74,6 +74,8 @@ python -m emg2qwerty.train \
   trainer.devices=1
 ```
 
+Alternatively, the CNN+BiLSTM model can be trained using the provided Jupyter notebook: `cnn_bilstm_train.ipynb`. Open the notebook and run all cells.
+
 **CNN + BiGRU**
 ```bash
 python -m emg2qwerty.train \
@@ -108,10 +110,6 @@ This submission includes code files, config files, and project write-up material
 ### Exploratory Model
 
 We also explored a Transformer/vision-transformer-style model as an additional architectural direction. It was treated as exploratory and was not included in the main quantitative comparison because its training behavior was unstable and its results were not competitive with the main recurrent and hybrid models.
-
-### Environment
-
-All experiments were run in Google Colab with GPU acceleration.
 
 ### Checkpoint Note
 

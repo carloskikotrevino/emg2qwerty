@@ -12,7 +12,7 @@ Main reported results
 - CNN + BiGRU: Train CER 6.08, Val CER 15.97, Test CER 15.32
 
 Main conclusion
-The TDS baseline is substantially improved by adding explicit bidirectional sequence modeling. The Bidirectional GRU reduces test CER from 28.88 to 17.33, showing that long-range temporal context is important for this task. Adding a temporal convolutional stage before the recurrent encoder improves performance further. CNN+BiLSTM gives the best overall result at 14.96 test CER, and CNN+BiGRU closely follows at 15.32, indicating that the hybrid CNN+RNN structure is especially effective for offline keystroke decoding from sEMG.
+The TDS baseline is substantially improved by adding explicit bidirectional sequence modeling. The Bidirectional GRU reduces test CER from 23.80 to 17.33, showing that long-range temporal context is important for this task. Adding a temporal convolutional stage before the recurrent encoder improves performance further. CNN+BiLSTM gives the best overall result at 14.96 test CER, and CNN+BiGRU closely follows at 15.32, indicating that the hybrid CNN+RNN structure is especially effective for offline keystroke decoding from sEMG.
 
 Files included in this submission
 This submission includes code files, config files, and project write-up materials only, following the TA instruction not to submit checkpoints or logs.
@@ -34,9 +34,6 @@ Reported model ownership
 
 Exploratory model
 We also explored a Transformer / vision-transformer-style model as an architectural idea. It was treated as exploratory and was not included in the main quantitative comparison because its training behavior was unstable and its results were not competitive with the main recurrent and hybrid models.
-
-Environment / execution
-The final CNN+BiGRU experiment was executed in Google Colab with GPU acceleration by Anik Malik. Other results were produced from the shared project codebase and analyzed jointly by the group.
 
 Exact command used for the final CNN+BiGRU run
 python -m emg2qwerty.train \
@@ -62,12 +59,16 @@ python -m emg2qwerty.train \
   trainer.accelerator=gpu \
   trainer.devices=1
 
-Typical run command for the CNN+BiLSTM model
+Exact command used for the CNN+BiLSTM model
 python -m emg2qwerty.train \
   model=cnn_bilstm_ctc \
   user=single_user \
   trainer.accelerator=gpu \
   trainer.devices=1
+
+Alternatively, the CNN+BiLSTM model can be trained using the provided Jupyter notebook:
+  cnn_bilstm_train.ipynb
+Open the notebook and run all cells. It includes the full training pipeline and can be run in Google Colab or any local Jupyter environment with GPU support.
 
 Notes on the configs
 - rnn_ctc.yaml contains the Bidirectional GRU configuration.
