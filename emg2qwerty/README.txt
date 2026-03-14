@@ -66,6 +66,13 @@ python -m emg2qwerty.train \
   trainer.accelerator=gpu \
   trainer.devices=1
 
+Exact command used for the Transformer model
+python -m emg2qwerty.train \
+  model=vit \
+  user=single_user \
+  trainer.accelerator=gpu \
+  trainer.devices=1
+
 Alternatively, the CNN+BiLSTM model can be trained using the provided Jupyter notebook:
   cnn_bilstm_train.ipynb
 Open the notebook and run all cells. It includes the full training pipeline and can be run in Google Colab or any local Jupyter environment with GPU support.
